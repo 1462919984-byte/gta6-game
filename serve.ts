@@ -1,7 +1,9 @@
-// A tiny static server for game/ (Node 22, standard library only), so an entry can be played
-// locally without a build step: `node serve.ts` serves game/ on http://localhost:8080.
-// It sends the MIME types a browser game needs, refuses any path outside game/, and otherwise
-// does nothing clever: this is a development convenience, not a web server for the internet.
+// A tiny static server for game/ (Node 22, standard library only) so the entry can
+// be played locally without a build step: `node serve.ts` serves game/ on
+// http://localhost:8080 (or `--port N`). It sends the MIME types a browser game
+// needs, refuses any path outside game/, answers a liveness /healthz endpoint, and
+// otherwise does nothing clever: this is a development convenience, not a web
+// server for the internet.
 import { createReadStream, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize, resolve, sep } from 'node:path';
@@ -39,6 +41,14 @@ const MIME: Record<string, string> = {
 
 createServer((request, response) => {
   const url = new URL(request.url ?? '/', 'http://localhost');
+
+  // Liveness probe: a plain ok without touching the filesystem.
+  if (url.pathname === '/healthz') {
+    response.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
+    response.end('ok');
+    return;
+  }
+
   let pathname: string;
   try {
     pathname = decodeURIComponent(url.pathname);
@@ -68,5 +78,5 @@ createServer((request, response) => {
   });
   createReadStream(file).pipe(response);
 }).listen(port, '127.0.0.1', () => {
-  console.log(`game/ is on http://localhost:${port}`);
+  console.log(`Solara Coast static server: game/ is on http://localhost:${port}`);
 });

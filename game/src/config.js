@@ -1,5 +1,7 @@
-// All tuning numbers, colours and world constants for Solara Coast live here so the
-// rest of the game never hard-codes a magic value.
+// Every tuning number, colour, world constant and reward table for Solara Coast
+// lives in this one file so the rest of the game never hard-codes a magic value.
+// The new systems (multi-stage missions, coordinated pursuit, live minimap and
+// sprint/stamina) read their thresholds from here.
 
 export const STEP = 1 / 60;
 
@@ -34,6 +36,8 @@ export const COLOURS = {
   copLightRed: '#ff4b4b',
   player: '#3f9bd9',
   enemy: '#c94f4f',
+  barrier: '#c8503c',
+  barrierStripe: '#f2e2c0',
   traffic: ['#c9d2d8', '#b3544a', '#5a7fae', '#e3e0d5', '#3a6f4f', '#d8a24a', '#7a5fa8'],
   ped: ['#d9b8a3', '#b98a6a', '#8a6a52', '#e0d5c9', '#5f4a3a'],
 };
@@ -45,6 +49,10 @@ export const PLAYER = {
   height: 1.8,
   maxHealth: 100,
   maxArmour: 100,
+  maxStamina: 100,
+  sprintDrain: 24,       // stamina lost per second while sprinting
+  sprintRegen: 30,       // stamina regained per second while resting
+  minSprintStamina: 6,   // must have this much before sprinting again
 };
 
 export const VEHICLE = {
@@ -59,19 +67,56 @@ export const VEHICLE = {
 
 export const WANTED = {
   maxStars: 5,
-  decay: 0.045,
-  baseCool: 6,
-  cooldownPerStar: 2.2,
-  searchRadius: 130,
-  airRadius: 90,
+  // Escape/cooldown: a star decays only after this many seconds with no unit
+  // holding line of sight, plus a little extra for each star on top.
+  escapeTime: 5.5,
+  escapePerStar: 2.0,
+  losRange: 112,          // a unit can see the player within this many metres
+  losSamples: 6,          // ray samples used to check building occlusion
+  // Response composition by wanted stars (0 = none).
+  unitCounts: [0, 2, 3, 4, 6, 8],
+  carRatio: 0.45,         // fraction of ground units that are cruisers
+  roadblockLevel: 3,      // roadblocks begin at 3 stars
+  helicopterLevel: 4,     // Air One joins at 4 stars
+  interceptAhead: 70,     // interceptors aim this far ahead of the player
+  flankAhead: 38,         // flankers lead the player by this distance
+  roadblockAhead: 92,     // roadblocks are placed this far down the road
+  pursuitTopSpeed: 42,
+  unitTopSpeed: 46,
+};
+
+export const MINIMAP = {
+  smallRadius: 62,
+  largeRadius: 300,
+  smallCanvasW: 172,
+  smallCanvasH: 172,
+  largeCanvasW: 640,
+  largeCanvasH: 640,
+  refreshMs: 100,         // full map redraw at most 10 times per second
+  worldScale: 1.05,       // metres -> minimap pixels at small size
+  blip: {
+    player: '#4fc3f7',
+    police: '#4d8bff',
+    traffic: '#9aa4b2',
+    mission: '#ffd27a',
+    roadblock: '#ff6a5a',
+    district: '#6ed27a',
+  },
+};
+
+export const MISSION_REWARDS = {
+  stageCash: 250,          // paid immediately when a stage completes
+  stageRespect: 15,        // paid immediately when a stage completes
+  respect: { GOLD: 100, SILVER: 60, BRONZE: 35 },
+  cash: [0, 900, 1400, 1800, 2200, 2600, 3000, 3400, 4200], // per mission id
 };
 
 export const WEAPONS = [
-  { id: 'fists', name: 'FISTS', slot: 1, ammo: -1, damage: 12, range: 2.4, rate: 0.35, colour: '#e8e0d0' },
-  { id: 'pistol', name: 'M9 VOLT', slot: 2, ammo: 96, damage: 26, range: 60, rate: 0.22, colour: '#9fb0c0' },
-  { id: 'smg', name: 'FALCO SMG', slot: 3, ammo: 240, damage: 16, range: 48, rate: 0.09, colour: '#7fa8d8' },
-  { id: 'shotgun', name: 'MAREA 12', slot: 4, ammo: 48, damage: 62, range: 22, rate: 0.85, colour: '#d8a24a' },
-  { id: 'rifle', name: 'CORCEL R-7', slot: 5, ammo: 150, damage: 34, range: 90, rate: 0.14, colour: '#5a7fae' },
+  { id: 'fists', name: 'FISTS', slot: 1, ammo: -1, damage: 12, range: 2.4, rate: 0.35, spread: 0.03, colour: '#e8e0d0' },
+  { id: 'pistol', name: 'M9 VOLT', slot: 2, ammo: 96, damage: 26, range: 60, rate: 0.22, spread: 0.012, colour: '#9fb0c0' },
+  { id: 'smg', name: 'FALCO SMG', slot: 3, ammo: 240, damage: 16, range: 48, rate: 0.09, spread: 0.024, colour: '#7fa8d8' },
+  { id: 'shotgun', name: 'MAREA 12', slot: 4, ammo: 48, damage: 62, range: 22, rate: 0.85, spread: 0.065, colour: '#d8a24a' },
+  { id: 'rifle', name: 'CORCEL R-7', slot: 5, ammo: 150, damage: 34, range: 90, rate: 0.14, spread: 0.004, colour: '#5a7fae' },
 ];
 
 export const RADIO = [
@@ -111,5 +156,6 @@ export const KEY = {
   interact: ['KeyF'],
   horn: ['KeyH'],
   radio: ['KeyTab'],
-  mission: ['KeyM'],
+  mission: ['KeyJ'],
+  minimap: ['KeyM'],
 };

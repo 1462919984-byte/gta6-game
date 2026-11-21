@@ -52,74 +52,17 @@ export function createHud(canvas) {
     ctx.clip();
   }
 
-  function drawMinimap(state) {
-    const cx = 90, cy = 78, r = 66;
-    clipCircle(cx, cy, r);
-    fill(cx - r, cy - r, r * 2, r * 2, '#101622');
-    // North indicator.
-    text('N', cx, cy - r + 4, 13, '#ffd27a', 'center', 'bold');
-
-    // Roads.
-    ctx.strokeStyle = '#3a3f4c';
-    ctx.lineWidth = px(2);
-    const scale = r / (CITY.half * 0.16);
-    ctx.beginPath();
-    const spacing = CITY.block + CITY.roadW;
-    for (let k = -9; k <= 9; k += 1) {
-      const rx = cx + k * spacing * scale * 0.14;
-      ctx.moveTo(px(rx), px(cy - r)); ctx.lineTo(px(rx), px(cy + r));
-      const rz = cy + k * spacing * scale * 0.14;
-      ctx.moveTo(px(cx - r), px(rz)); ctx.lineTo(px(cx + r), px(rz));
-    }
-    ctx.stroke();
-
-    // District dots coloured by standing.
-    for (const d of DISTRICTS) {
-      const c = worldCentre(d.id);
-      const dx = (c.x - state.player.pos.x) * scale;
-      const dz = (c.z - state.player.pos.z) * scale;
-      const mx = cx + dx;
-      const mz = cy + dz;
-      if (Math.hypot(dx, dz) > r - 4) continue;
-      const standing = state.standing[d.id] ?? 0;
-      const col = standing >= 60 ? '#6ed27a' : standing >= 30 ? '#e0c07a' : '#e05a5a';
-      ctx.fillStyle = col;
-      ctx.beginPath();
-      ctx.arc(px(mx), px(mz), px(3.5), 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // Mission and activity markers.
-    if (state.mission && state.mission.marker) {
-      const mx = cx + (state.mission.marker.x - state.player.pos.x) * scale;
-      const mz = cy + (state.mission.marker.z - state.player.pos.z) * scale;
-      if (Math.hypot(mx - cx, mz - cy) < r - 2) {
-        ctx.fillStyle = '#ffd27a';
-        ctx.beginPath(); ctx.arc(px(mx), px(mz), px(5), 0, Math.PI * 2); ctx.fill();
-      }
-    }
-
-    // Police blips.
-    ctx.fillStyle = '#4d8bff';
-    for (const u of state.police.units) {
-      const ux = cx + (u.x - state.player.pos.x) * scale;
-      const uz = cy + (u.z - state.player.pos.z) * scale;
-      if (Math.hypot(ux - cx, uz - cy) < r - 2) {
-        ctx.beginPath(); ctx.arc(px(ux), px(uz), px(2.6), 0, Math.PI * 2); ctx.fill();
-      }
-    }
-
-    // Player arrow.
-    ctx.fillStyle = '#4fc3f7';
-    ctx.beginPath();
-    ctx.moveTo(px(cx), px(cy - 8));
-    ctx.lineTo(px(cx - 5), px(cy + 6));
-    ctx.lineTo(px(cx + 5), px(cy + 6));
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-
-    stroke(cx - r, cy - r, r * 2, r * 2, '#3a3f4c', r, 2);
+  function drawMinimapTracker(state) {
+    // The live minimap lives on its own canvas (mounted by index.html) and is
+    // updated by the minimap module; the HUD draws only this small legend panel
+    // that keeps the tracker readable even while the minimap is small.
+    const x = 22, y = 108, w = 176;
+    fill(x, y, w, 62, 'rgba(12,16,26,0.82)', 7);
+    stroke(x, y, w, 62, '#3a4252', 7, 1);
+    text('LIVE MAP', x + 12, y + 8, 11, '#7fd4ff', 'left', 'bold');
+    const mode = state.minimapLarge ? 'LARGE — M to shrink' : 'SMALL — M to enlarge';
+    text(mode, x + 12, y + 26, 10, '#b9c4d6');
+    text('TRACKING', x + 12, y + 42, 9, '#ffd27a', 'left', 'bold');
   }
 
   function worldCentre(id) {
@@ -139,6 +82,11 @@ export function createHud(canvas) {
     fill(ax, ay, w, 12, '#151b26', 4);
     fill(ax, ay, w * (state.player.armour / 100), 12, '#c9a24a', 4);
     text('ARMOUR', ax, ay + 15, 11, '#b9c4d6');
+    // Sprint stamina (the new on-foot resource).
+    const sx = 28, sy = 220;
+    fill(sx, sy, w, 10, '#151b26', 4);
+    fill(sx, sy, w * (state.player.stamina / 100), 10, '#8fd4ff', 4);
+    text('SPRINT', sx, sy + 13, 10, '#b9c4d6');
   }
 
   function drawWanted(state) {
@@ -192,6 +140,7 @@ export function createHud(canvas) {
     text(`STAGE ${m.stageIndex + 1}/${m.current.stages.length} · ${stage.text.toUpperCase()}`, x + 16, y + 42, 13, '#e8f0f8', 'left', 'bold');
     text(`OBJECTIVE: ${stage.text}`, x + 16, y + 64, 12, '#b9c4d6');
     text(`NEXT: ${stage.next}`, x + 16, y + 86, 12, '#7fd4ff');
+    text('M — toggles the live minimap size', x + 16, y + 100, 10, '#7a8698');
   }
 
   function drawCar(state) {
@@ -215,9 +164,9 @@ export function createHud(canvas) {
   }
 
   function drawClock(state) {
-    const h = Math.floor(state.clock.hour) % 24;
-    const m = Math.floor(state.clock.minute);
-    const label = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} ${state.clock.night > 0.5 ? 'NIGHT' : 'DAY'}`;
+    // Use the clock module's own formatted string (it now owns the day/night
+    // phrasing), so the HUD clock and the minimap clock always match.
+    const label = state.clock?.label ?? '16:30 DAY';
     text(label, 640, 20, 13, '#e8f0f8', 'center', 'bold');
   }
 
@@ -318,7 +267,7 @@ export function createHud(canvas) {
     ctx.setTransform(view.scale, 0, 0, view.scale, 0, 0);
     ctx.clearRect(0, 0, canvas.width / view.scale, canvas.height / view.scale);
     if (state.screen !== 'play') return;
-    drawMinimap(state);
+    drawMinimapTracker(state);
     drawBars(state);
     drawWanted(state);
     drawWeapons(state);

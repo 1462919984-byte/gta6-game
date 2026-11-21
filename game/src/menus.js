@@ -217,7 +217,7 @@ export function createMenus(hud, save) {
       } else if (pauseTab === 'crew') {
         lines = CREW.map(c => `${c.name} — ${c.role}: ${c.ability} [${c.key.replace('Key', '')}]${state.crew[c.id] ? ' — RECRUITED' : ' — LOCKED'}`);
       } else if (pauseTab === 'settings') {
-        lines = [`VOLUME ${Math.round(state.settings.volume * 100)}`, `MUSIC ${Math.round(state.settings.music * 100)}`, `QUALITY ${state.settings.quality === 1 ? 'HIGH' : 'LOW'}`, `INVERT Y ${state.settings.invertY ? 'ON' : 'OFF'}`, 'Use ← → to change · Enter to confirm'];
+        lines = [`VOLUME ${Math.round(state.settings.volume * 100)}`, `MUSIC ${Math.round(state.settings.music * 100)}`, `QUALITY ${state.settings.quality === 1 ? 'HIGH' : 'LOW'}`, `INVERT Y ${state.settings.invertY ? 'ON' : 'OFF'}`, `MINIMAP ${state.settings.minimapLarge ? 'LARGE' : 'SMALL'} — press M to toggle`, 'Use ← → to change · Enter to confirm'];
       } else if (pauseTab === 'controls') {
         lines = ['W A S D — walk / drive', 'F — enter or exit a car', 'MOUSE — aim · LEFT CLICK / SPACE — fire', 'SHIFT — run', 'Q E R — crew abilities', 'TAB — radio · H — horn', 'P / ESC — pause'];
       } else if (pauseTab === 'save') {
@@ -248,12 +248,18 @@ export function createMenus(hud, save) {
     return null;
   }
 
+  function toggleMinimapSize() {
+    const next = !save.settings.minimapLarge;
+    save.updateSettings({ minimapLarge: next });
+    return next;
+  }
+
   return { drawTitle, drawPause, drawTabs, isTitle, isPause,
     get screen() { return screen; },
     get pauseTab() { return pauseTab; },
     get titleIndex() { return titleIndex; },
     get pauseIndex() { return pauseIndex; },
-    titleButtons, tabs, pointer,
+    titleButtons, tabs, pointer, toggleMinimapSize,
     setScreen(s) { screen = s; },
     setTab(t) { pauseTab = t; pauseIndex = tabs.indexOf(t); },
     setTitle(i) { titleIndex = i; },

@@ -1,7 +1,8 @@
-// Procedural world: the street grid, buildings, palms, docks, beach, water and every
-// static object of Solara Coast. It also answers the questions the rest of the game
-// asks of the city — is a point on the road, on the beach, blocked by a building — and
-// returns the seed-fixed layout so the screenshots are reproducible.
+// Procedural world: the street grid, buildings, palms, docks, beach, water, the
+// roadblock spawn points and mission-relevant landmarks. It answers the spatial
+// questions the rest of the game asks — is a point on the road, on the beach,
+// blocked by a building, where the nearest road line is — and returns a
+// seed-fixed layout so the screenshots are reproducible.
 
 import { CITY, COLOURS } from './config.js';
 
@@ -18,6 +19,8 @@ export function createWorld(random) {
   const billboards = [];
   const hydrants = [];
   const district = [];
+  const roadblockPoints = [];
+  const landmarks = [];
 
   // A building lot. `x,z` is the centre of the cell, `w,d` the footprint.
   function addBuilding(x, z, w, d, h, colour, style) {
@@ -73,7 +76,6 @@ export function createWorld(random) {
   for (let x = -520; x <= 520; x += 14) {
     if (Math.abs(x) % 56 < 14) palms.push({ x, z: 448, s: 1.2 + random() * 0.5 });
   }
-  // The sea wall and a second row for depth.
   for (let x = -540; x <= 540; x += 6) {
     if (random() > 0.82) palms.push({ x, z: 476 + random() * 22, s: 1 + random() * 0.6 });
   }
@@ -92,7 +94,7 @@ export function createWorld(random) {
     hydrants.push({ x: -420 + h * 118, z: 30, red: true });
   }
 
-  // District centres, used by the HUD map and standing system.
+  // District centres, used by the HUD map, standing system and mission markers.
   const centres = [
     { id: 'mariposa', x: -360, z: -120 },
     { id: 'vista', x: 120, z: 420 },
@@ -101,6 +103,33 @@ export function createWorld(random) {
     { id: 'mirador', x: 420, z: 140 },
     { id: 'puerto', x: 300, z: 320 },
   ];
+
+  // Roadblock spawn points: intersections where a cruiser can park across a road
+  // without overlapping a building. Police and missions query these.
+  for (let k = -8; k <= 8; k += 1) {
+    for (let j = -8; j <= 8; j += 1) {
+      const x = k * spacing;
+      const z = j * spacing;
+      if (isWater(x, z)) continue;
+      roadblockPoints.push({ x, z, vertical: true });
+      roadblockPoints.push({ x, z: z + spacing / 2, vertical: false });
+    }
+  }
+
+  // Mission-relevant landmarks: named places the story stages point at.
+  landmarks.push(
+    { id: 'north-docks', name: 'NORTH DOCKS', x: 300, z: 330 },
+    { id: 'night-market', name: 'NIGHT MARKET', x: -360, z: -120 },
+    { id: 'boulevard', name: 'COASTAL BOULEVARD', x: 0, z: 446 },
+    { id: 'palm-garage', name: 'PALMA GARAGE', x: -120, z: 200 },
+    { id: 'coral-garage', name: 'CORAL GARAGE', x: 330, z: -260 },
+    { id: 'mirador-hills', name: 'MIRADOR HILLS', x: 420, z: 140 },
+    { id: 'sunset-overlook', name: 'SUNSET OVERLOOK', x: -480, z: 420 },
+  );
+
+  function landmark(id) {
+    return landmarks.find(l => l.id === id) ?? { id, name: id, x: 0, z: 60 };
+  }
 
   function districtAt(x, z) {
     let best = 'vista';
@@ -112,15 +141,34 @@ export function createWorld(random) {
     return best;
   }
 
-  // Roads lie along grid lines; the beach boulevard is a wide road too.
   function onRoad(x, z) {
     const gx = x - Math.round(x / spacing) * spacing;
     const gz = z - Math.round(z / spacing) * spacing;
     if (Math.abs(gx) < roadHalf) return true;
     if (Math.abs(gz) < roadHalf) return true;
-    // Coastal boulevard across the south, above the beach.
     if (z > 430 && z < 462 && Math.abs(x) < 540) return true;
     return false;
+  }
+
+  // The nearest point on a road line to (x,z), used to park roadblocks neatly.
+  function snapToRoad(x, z) {
+    const gx = Math.round(x / spacing) * spacing;
+    const gz = Math.round(z / spacing) * spacing;
+    // Prefer the closer of the two crossing road lines.
+    const vDist = Math.abs(x - gx);
+    const hDist = Math.abs(z - gz);
+    if (vDist <= hDist) return { x: gx, z, vertical: true };
+    return { x, z: gz, vertical: false };
+  }
+
+  function nearestRoadblockPoint(x, z) {
+    let best = null;
+    let bestD = 1e9;
+    for (const p of roadblockPoints) {
+      const d = (p.x - x) * (p.x - x) + (p.z - z) * (p.z - z);
+      if (d < bestD) { bestD = d; best = p; }
+    }
+    return best;
   }
 
   function blockedCircle(x, z, r) {
@@ -137,9 +185,22 @@ export function createWorld(random) {
     return false;
   }
 
+  // Does the straight segment a->b cross a building footprint? Used by police
+  // line-of-sight checks so a cruiser around a corner no longer counts as seeing.
+  function segmentBlocked(ax, az, bx, bz) {
+    const steps = Math.ceil(Math.hypot(bx - ax, bz - az) / 3);
+    for (let i = 1; i < steps; i += 1) {
+      const t = i / steps;
+      if (blockedCircle(ax + (bx - ax) * t, az + (bz - az) * t, 0.6)) return true;
+    }
+    return false;
+  }
+
   return {
     buildings, palms, lamps, docks, billboards, hydrants,
-    centres, districtAt, onRoad, blockedCircle, isWater, onBeach,
+    centres, roadblockPoints, landmarks,
+    districtAt, onRoad, blockedCircle, isWater, onBeach,
+    snapToRoad, nearestRoadblockPoint, segmentBlocked, landmark,
     spacing, half,
   };
 }

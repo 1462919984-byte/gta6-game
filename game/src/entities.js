@@ -1,5 +1,7 @@
-// Low-poly people and cars, all built from a few boxes and cylinders so every
-// character and vehicle of Solara Coast is original art and cheap to render.
+// Low-poly people, cars and street furniture, all built from a few boxes and
+// cylinders so every character and vehicle of Solara Coast is original art and
+// cheap to render. The roadblock barrier maker is shared by the police pursuit
+// and the staged chase scenes.
 
 import * as THREE from 'three';
 import { COLOURS } from './config.js';
@@ -122,6 +124,29 @@ export function makeHelicopter() {
   const light = box(0.8, 0.5, 0.4, basic(COLOURS.copLightBlue));
   light.position.set(0, 0.9, -1.8);
   g.add(light);
+  return g;
+}
+
+/** A striped roadblock barrier: a low red/white gate with two feet and a lamp. */
+export function makeRoadblockBarrier() {
+  const g = new THREE.Group();
+  const arm = box(6.2, 0.28, 0.5, mat(COLOURS.barrier));
+  arm.position.y = 1.05;
+  g.add(arm);
+  // Alternating white stripes so the barrier reads clearly from a chase camera.
+  for (let i = -2; i <= 2; i += 1) {
+    const stripe = box(0.5, 0.3, 0.56, basic(COLOURS.barrierStripe));
+    stripe.position.set(i * 1.15, 1.05, 0);
+    g.add(stripe);
+  }
+  for (const sx of [-2.9, 2.9]) {
+    const foot = box(0.5, 1.0, 0.9, mat('#20242c'));
+    foot.position.set(sx, 0.5, 0);
+    g.add(foot);
+  }
+  const lamp = box(0.22, 0.5, 0.22, basic(COLOURS.copLightRed));
+  lamp.position.set(0, 1.55, 0);
+  g.add(lamp);
   return g;
 }
 

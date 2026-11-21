@@ -86,6 +86,13 @@ export function stageShot(name, ctx) {
     state.screen = 'pause';
     state.menus.setScreen('pause');
     state.menus.setTab('stats');
+    // Stage the live minimap large and an active mission tracker so the map shot
+    // shows both the new systems in the same frame.
+    state.minimapLarge = true;
+    state.mission = missions;
+    missions.start(3);
+    state.mission.marker = { x: -360, z: -120 };
+    state.banner = { title: 'MISSION 3 · MARKET SQUEEZE', sub: 'STAGE 2/4 · CLEAR THE FOUR AISLES', next: 'DEFEAT THE ARMED THUGS' };
     // Populate two save slots so the stats screen is dense.
     state.save.slots[0] = { act: 2, mission: 5, cash: 84000, respect: 42, rank: 'COAST LIEUTENANT', completion: 66.1, stats: state.stats, standing: state.standing, crew: { mara: true, tito: true, nia: true } };
     state.save.slots[1] = { act: 1, mission: 2, cash: 12000, respect: 6, rank: 'STREET RAT', completion: 8.3, stats: { carsStolen: 3, copsEscaped: 1, distanceDriven: 2.1, peopleTakenOut: 0, missionsGold: 0, stuntJumps: 0, collectibles: 0 }, standing: state.standing, crew: { mara: false, tito: false, nia: false } };

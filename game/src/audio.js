@@ -1,6 +1,7 @@
 // Original WebAudio sound: no samples, no copyright. A tiny synth engine builds
-// engine hums, gunshots, sirens, chimes, radio jingles and a two-chord ambient pad
-// procedurally. Nothing is fetched from the network.
+// engine hums, gunshots, sirens, chimes, radio jingles, a mission-stage cue, a
+// wanted-level sting and a two-chord ambient pad procedurally. Nothing is fetched
+// from the network.
 
 export function createAudio() {
   let ctx = null;
@@ -78,9 +79,23 @@ export function createAudio() {
   function mission() { tone(440, 0.16, 'sine', 0.2, 0, 160); tone(554, 0.16, 'sine', 0.2, 0.14, 160); tone(659, 0.3, 'sine', 0.22, 0.28, 120); }
   function busted() { tone(300, 0.5, 'sawtooth', 0.25, 0, -220); tone(200, 0.6, 'sawtooth', 0.2, 0.1, -140); }
 
+  // A rising two-note "stage complete" cue, distinct from the collect chime.
+  function stageComplete() {
+    tone(523, 0.14, 'sine', 0.22, 0, 80);
+    tone(659, 0.16, 'sine', 0.2, 0.12, 80);
+    tone(784, 0.28, 'sine', 0.24, 0.26, 60);
+  }
+
+  // A harsh alert when a wanted star is added: an upward saw with a noise burst.
+  function wantedRise(stars) {
+    const base = 240 + stars * 80;
+    tone(base, 0.18, 'sawtooth', 0.22, 0, 220);
+    tone(base * 1.5, 0.2, 'sawtooth', 0.16, 0.16, 180);
+    noise(0.22, 0.16, 0.02);
+  }
+
   function step(dt, state) {
     if (!ctx) return;
-    // Radio: a gentle two-note pad and a jingle every few seconds.
     radioTimer -= dt;
     jingleTimer -= dt;
     if (state.player.inVehicle && state.wanted === 0) {
@@ -97,7 +112,6 @@ export function createAudio() {
         jingleTimer = 8 + Math.random() * 6;
       }
     }
-    // Sirens pulse with the wanted level.
     if (state.wanted > 0 && state.sirenTimer <= 0) {
       siren();
       state.sirenTimer = 0.55;
@@ -107,5 +121,8 @@ export function createAudio() {
   function setVolume(v) { volume = v; if (master) master.gain.value = v; }
   function setMusic(v) { musicLevel = v; if (musicGain) musicGain.gain.value = v; }
 
-  return { ensure, step, setEngine, gunshot, punch, siren, hit, collect, mission, busted, setVolume, setMusic };
+  return {
+    ensure, step, setEngine, gunshot, punch, siren, hit, collect, mission, busted,
+    stageComplete, wantedRise, setVolume, setMusic,
+  };
 }

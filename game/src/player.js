@@ -1,6 +1,8 @@
-// The player controller: on-foot movement with a run button, and vehicle handling
-// with speed, steering, handbrake, damage and entering/leaving any traffic car.
-// It returns the player's transform each step and keeps the third-person camera.
+// The player controller: on-foot movement with sprint and stamina, and vehicle
+// handling with speed, steering, handbrake, damage and entering/leaving any
+// traffic car. It also exposes a single clean position/heading accessor the live
+// minimap and camera both read, so there is one source of truth for the player's
+// transform every frame.
 
 import { PLAYER, VEHICLE, CITY } from './config.js';
 
@@ -13,6 +15,8 @@ export function createPlayer(world) {
   let hp = PLAYER.maxHealth;
   let armour = 0;
   let dents = 0;
+  let stamina = PLAYER.maxStamina;
+  let sprinting = false;
 
   function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
 
@@ -20,10 +24,10 @@ export function createPlayer(world) {
     vehicle = v;
     inVehicle = true;
     speed = 0;
+    sprinting = false;
   }
 
   function exit() {
-    // Place the player beside the car, checking the road is not blocked.
     const side = Math.sign(Math.random() - 0.5) || 1;
     let ex = vehicle.x + side * VEHICLE.exitOffset;
     let ez = vehicle.z + VEHICLE.exitOffset;
@@ -50,16 +54,22 @@ export function createPlayer(world) {
 
   function step(dt, input, traffic, onFoot) {
     if (!inVehicle) {
-      // On foot.
+      // On foot: walk or sprint. Sprint only while the stamina tank has charge,
+      // and stamina only refills while not sprinting.
       const move = input.move();
-      const run = input.run() ? PLAYER.runSpeed : PLAYER.walkSpeed;
+      const wantsSprint = input.run();
+      sprinting = wantsSprint && stamina > 0;
+      const speedNow = sprinting ? PLAYER.runSpeed : PLAYER.walkSpeed;
+      if (sprinting) stamina = Math.max(0, stamina - PLAYER.sprintDrain * dt);
+      else stamina = Math.min(PLAYER.maxStamina, stamina + PLAYER.sprintRegen * dt);
+
       const mx = move.x;
       const mz = move.y;
       const len = Math.hypot(mx, mz) || 1;
       const nx = mx / len;
       const nz = mz / len;
-      const sx = pos.x + nx * run * dt;
-      const sz = pos.z + nz * run * dt;
+      const sx = pos.x + nx * speedNow * dt;
+      const sz = pos.z + nz * speedNow * dt;
       if (!world.blockedCircle(sx, sz, PLAYER.radius) && !world.isWater(sx, sz)) {
         pos.x = sx;
         pos.z = sz;
@@ -79,14 +89,12 @@ export function createPlayer(world) {
     else if (target > speed) speed = Math.min(target, speed + VEHICLE.accel * dt);
     else speed = Math.max(target, speed - VEHICLE.brake * dt);
 
-    // Steering scales down with speed for a stable chase feel.
     const steerFactor = 1 - Math.min(0.82, Math.abs(speed) / (VEHICLE.maxSpeed * 1.4));
     heading += steer * VEHICLE.turn * steerFactor * dt;
 
     const vx = Math.sin(heading) * speed;
     const vz = Math.cos(heading) * speed;
 
-    // Collide with buildings; a hard hit dents the car.
     let hit = false;
     if (world.blockedCircle(vehicle.x + vx * dt, vehicle.z + vz * dt, 1.1) || world.isWater(vehicle.x + vx * dt, vehicle.z + vz * dt)) {
       speed *= -0.25;
@@ -96,12 +104,10 @@ export function createPlayer(world) {
       vehicle.z += vz * dt;
     }
 
-    // A dent on any solid collision; fast impacts dent more.
     if (hit && Math.abs(speed) > 5) {
       dents = Math.min(VEHICLE.maxDents, dents + Math.abs(speed) * 2.4);
     }
 
-    // Keep the player glued to the car for the camera and interactions.
     pos.x = vehicle.x;
     pos.z = vehicle.z;
     vehicle.heading = heading;
@@ -115,7 +121,8 @@ export function createPlayer(world) {
   }
 
   return {
-    pos, get heading() { return heading; },
+    pos,
+    get heading() { return heading; },
     get inVehicle() { return inVehicle; },
     get vehicle() { return vehicle; },
     get speed() { return speed; },
@@ -123,13 +130,20 @@ export function createPlayer(world) {
     get hp() { return hp; },
     get armour() { return armour; },
     get dents() { return dents; },
+    get stamina() { return stamina; },
+    get sprinting() { return sprinting; },
     set hp(v) { hp = clamp(v, 0, PLAYER.maxHealth); },
     set armour(v) { armour = clamp(v, 0, PLAYER.maxArmour); },
     set dents(v) { dents = clamp(v, 0, VEHICLE.maxDents); },
+    // One clean accessor for everything that needs the player's transform.
+    get transform() {
+      return { x: pos.x, z: pos.z, heading, inVehicle, speed, stamina };
+    },
     enter, exit, nearestCar, step,
     reset() {
       pos.x = 0; pos.z = 60; heading = Math.PI; inVehicle = false; vehicle = null;
       speed = 0; hp = PLAYER.maxHealth; armour = 0; dents = 0;
+      stamina = PLAYER.maxStamina; sprinting = false;
     },
   };
 }

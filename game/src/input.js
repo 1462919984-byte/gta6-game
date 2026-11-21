@@ -1,6 +1,7 @@
 // Keyboard and mouse input: held keys, a pointer-lock aim vector, and one-shot
-// actions queued as bit flags. Pause, entering cars, firing and abilities all read
-// from the same place so a press between frames is never dropped.
+// actions queued as bit flags so a press between frames is never dropped. The M
+// key toggles the minimap size; J opens the mission panel; pause, entering cars,
+// firing and abilities all read from the same queue.
 
 import { KEY } from './config.js';
 
@@ -12,6 +13,7 @@ export const A_HORN = 16;
 export const A_ABILITY = 32;
 export const A_JUMP = 64;
 export const A_MISSION = 128;
+export const A_MINIMAP = 256;
 
 const held = new Set();
 let aimX = 0;
@@ -40,6 +42,8 @@ export function createInput(target) {
       if (!event.repeat) buttons |= A_ABILITY;
     } else if (KEY.mission.includes(event.code)) {
       if (!event.repeat) buttons |= A_MISSION;
+    } else if (KEY.minimap.includes(event.code)) {
+      if (!event.repeat) buttons |= A_MINIMAP;
     }
   });
 

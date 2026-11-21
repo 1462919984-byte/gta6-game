@@ -1,6 +1,8 @@
-// The three.js scene: builds every mesh of Solara Coast from the procedural world and
-// updates the sky, sun, water and the camera each frame. This file is geometry and
-// materials only — no game rules live here.
+// The three.js scene: builds every mesh of Solara Coast from the procedural world
+// and updates the sky, sun, water and the camera each frame. This file is
+// geometry and materials only — no game rules live here. The roadblock barriers
+// are pre-built once and handed to the police system, and the overview lighting
+// tweak gives the staged map shot a flat, readable sun.
 
 import * as THREE from 'three';
 import { CITY, COLOURS } from './config.js';
@@ -25,7 +27,6 @@ function makeBuilding(b) {
     roof.position.set(0, b.h + 1.5, 0);
     mesh.add(roof);
   }
-  // Lit windows at golden hour: a subtle emissive strip near the top.
   const glow = new THREE.Mesh(
     new THREE.BoxGeometry(b.w - 1, 1.4, b.d - 1),
     new THREE.MeshBasicMaterial({ color: COLOURS.window })
@@ -86,8 +87,6 @@ export function createScene(world, renderer) {
   const scene = new THREE.Scene();
   scene.fog = new THREE.Fog(COLOURS.skyMid, 140, 720);
 
-  // Sky: a large gradient dome is overkill for a flat look, so the renderer clear
-  // colour is painted by updateSky and a sun disc + haze spheres carry the golden hour.
   const sun = new THREE.Mesh(
     new THREE.SphereGeometry(16, 24, 16),
     new THREE.MeshBasicMaterial({ color: COLOURS.sun, fog: false })
@@ -134,7 +133,6 @@ export function createScene(world, renderer) {
     const rz = box(CITY.roadW, 0.12, spacing * 2.4, roadMat);
     rz.position.set(0, 0.06, k * spacing);
     scene.add(rz);
-    // Lane dashes.
     if (k % 2 === 0) {
       const dash = box(0.4, 0.16, 6, lineMat);
       dash.position.set(k * spacing, 0.1, 0);
@@ -174,6 +172,13 @@ export function createScene(world, renderer) {
 
   const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 1600);
 
+  // A shared group for roadblock barrier meshes. Police adds and removes the
+  // actual barrier geometry into this group so the scene stays the single owner
+  // of world-space objects and the staged screenshots see the same barriers.
+  const barrierGroup = new THREE.Group();
+  barrierGroup.name = 'roadblocks';
+  scene.add(barrierGroup);
+
   function updateSky(clock) {
     const t = Math.max(0, Math.min(1, clock.night));
     renderer.setClearColor(new THREE.Color().setHSL(0.62 - t * 0.62, 0.55 - t * 0.4, 0.55 - t * 0.42));
@@ -182,5 +187,21 @@ export function createScene(world, renderer) {
     amb.intensity = 0.75 + t * 0.25;
   }
 
-  return { scene, camera, sun, water, updateSky };
+  // Overview lighting tweak: raises the ambient fill and lifts the key light so
+  // an overhead map/stats screenshot stays bright and legible at golden hour.
+  function setOverviewLighting(on) {
+    if (on) {
+      key.intensity = 2.3;
+      key.position.y = 320;
+      amb.intensity = 0.95;
+      fill.intensity = 0.85;
+    } else {
+      key.intensity = 2.0;
+      key.position.y = 240;
+      amb.intensity = 0.75;
+      fill.intensity = 0.65;
+    }
+  }
+
+  return { scene, camera, sun, water, barrierGroup, updateSky, setOverviewLighting };
 }
