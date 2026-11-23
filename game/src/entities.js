@@ -1,7 +1,7 @@
-// Low-poly people, cars and street furniture, all built from a few boxes and
-// cylinders so every character and vehicle of Solara Coast is original art and
-// cheap to render. The roadblock barrier maker is shared by the police pursuit
-// and the staged chase scenes.
+// Low-poly people, cars, stalls and street furniture, all built from a few boxes
+// and cylinders so every character and vehicle of Solara Coast is original art
+// and cheap to render. The roadblock barrier maker is shared by the police
+// pursuit and the staged chase scenes.
 
 import * as THREE from 'three';
 import { COLOURS } from './config.js';
@@ -41,16 +41,19 @@ export function makePerson(colour, headColour) {
   return g;
 }
 
-/** A stylised car: body, cabin, wheels and brake lights. */
-export function makeCar(colour) {
+/** A stylised car: body, cabin, wheels, lights and a colour-matched roof stripe. */
+export function makeCar(colour, bodyColour) {
   const g = new THREE.Group();
-  const bodyMat = mat(colour);
+  const bodyMat = mat(bodyColour ?? colour);
   const body = box(1.9, 0.55, 4.2, bodyMat);
   body.position.y = 0.62;
   g.add(body);
   const cabin = box(1.6, 0.5, 2.0, mat('#2b3038'));
   cabin.position.set(0, 1.08, -0.25);
   g.add(cabin);
+  const stripe = box(1.9, 0.06, 1.2, mat('#f2e2c0'));
+  stripe.position.set(0, 0.95, 0.4);
+  g.add(stripe);
   const wheels = mat('#17181c');
   for (const sx of [-0.82, 0.82]) {
     for (const sz of [-1.35, 1.4]) {
@@ -101,7 +104,7 @@ export function makeCop(colour) {
   return g;
 }
 
-/** A helicopter: body, tail boom, rotor and skids. */
+/** A helicopter: body, tail boom, rotor, skids and a front searchlight block. */
 export function makeHelicopter() {
   const g = new THREE.Group();
   const shell = box(1.6, 1.0, 3.4, mat(COLOURS.cop));
@@ -133,7 +136,6 @@ export function makeRoadblockBarrier() {
   const arm = box(6.2, 0.28, 0.5, mat(COLOURS.barrier));
   arm.position.y = 1.05;
   g.add(arm);
-  // Alternating white stripes so the barrier reads clearly from a chase camera.
   for (let i = -2; i <= 2; i += 1) {
     const stripe = box(0.5, 0.3, 0.56, basic(COLOURS.barrierStripe));
     stripe.position.set(i * 1.15, 1.05, 0);
@@ -150,7 +152,23 @@ export function makeRoadblockBarrier() {
   return g;
 }
 
-/** The player, a little brighter and slightly shorter than a cop. */
+/** A simple night-market stall with a coloured awning and a warm sign. */
+export function makeStall(s) {
+  const g = new THREE.Group();
+  const base = box(s.w, s.h, s.d, mat(s.colour));
+  base.position.y = s.h / 2;
+  g.add(base);
+  const roof = box(s.w + 0.6, 0.3, s.d + 0.6, mat(COLOURS.stallRoof));
+  roof.position.y = s.h + 0.15;
+  g.add(roof);
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(s.w * 0.8, 0.9), basic(COLOURS.window));
+  sign.position.set(0, s.h - 0.8, s.d / 2 + 0.02);
+  g.add(sign);
+  g.position.set(s.x, 0, s.z);
+  return g;
+}
+
+/** The player, a little brighter and slightly shorter than a cop, with a cap. */
 export function makePlayer() {
   const g = makePerson(COLOURS.player, '#f0c9a8');
   const cap = box(0.44, 0.12, 0.44, mat('#173a5e'));

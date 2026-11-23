@@ -2,7 +2,8 @@
 // procedural world, the three.js scene, the player, traffic, police, missions,
 // combat, audio, save slots, the live minimap and the HUD, then one loop advances
 // the simulation in fixed steps and paints every canvas. `?shot=` stages a
-// deterministic screenshot scene through stageShot.
+// deterministic screenshot scene through stageShot, including a fixed camera that
+// keeps the player visible (no tree or building ever blocks the subject).
 
 import * as THREE from 'three';
 import { STEP, RADIO, CREW, DISTRICTS, WEAPONS, MISSION_REWARDS, MINIMAP } from './config.js';
@@ -32,6 +33,7 @@ const seed = Number.isInteger(seedParam) ? seedParam : hashSeed('solara-2026');
 const random = createRandom(seed);
 const world = createWorld(random);
 
+
 const canvas = document.getElementById('gl');
 const hudCanvas = document.getElementById('hud');
 const minimapCanvas = document.getElementById('minimap');
@@ -46,6 +48,11 @@ const meshes = { makePerson, makeCar, makeCopCar, makeCop, makeHelicopter, makeP
 
 const player = createPlayer(world);
 const traffic = createTraffic(world, random, meshes);
+// Traffic and pedestrian meshes are built by traffic.js but it does not own the
+// scene, so main.js mounts them here. The carjacked vehicle mesh moves with the
+// player and the ambient cars stay visible in every shot.
+for (const c of traffic.cars) scene.scene.add(c.mesh);
+for (const p of traffic.peds) scene.scene.add(p.mesh);
 const police = createPolice(world, meshes);
 const combat = createCombat();
 const missions = createMissions(random);
@@ -69,9 +76,9 @@ const state = {
   ratings: missions.ratings,
   missionKills: 0,
   radioIndex: 0, sirenTimer: 0, district: 'vista',
-  mission: null, banner: null, aiming: false,
+  mission: null, objectiveMarker: null, banner: null, aiming: false,
   minimapLarge: Boolean(save.settings.minimapLarge),
-  rivalMesh: null, footProps: null, shotName,
+  rivalMesh: null, footProps: null, shotName, shotCamera: null,
   missionStartedAt: 0, missionTimer: 0, nextMission: null,
 };
 
@@ -93,7 +100,7 @@ function spawnEnemy(x, z, hp = 40) {
 function startMission(id) {
   missions.start(id);
   state.mission = missions;
-  state.mission.marker = missions.marker(world);
+  state.objectiveMarker = missions.marker(world);
   state.missionStartedAt = performance.now();
   state.missionTimer = 0;
   const s = missions.current.stages[0];
@@ -106,7 +113,7 @@ function nextStage() {
   missions.advance();
   if (missions.current) {
     const s = missions.stage;
-    state.mission.marker = missions.marker(world);
+    state.objectiveMarker = missions.marker(world);
     state.banner = { title: state.banner?.title ?? '', sub: `STAGE ${missions.stageIndex + 1}/${missions.current.stages.length} · ${s.text.toUpperCase()}`, next: s.next };
     state.cash += MISSION_REWARDS.stageCash;
     state.respect += MISSION_REWARDS.stageRespect;
@@ -134,9 +141,8 @@ function completeMission() {
 
 let missionTimer = 0;
 
-// Mission stage observations used by the typed completion checks.
 function missionContext() {
-  const marker = state.mission?.marker ?? null;
+  const marker = state.objectiveMarker ?? null;
   return {
     x: player.pos.x,
     z: player.pos.z,
@@ -215,7 +221,6 @@ function pickCarName() {
 function startMissionByKey() {
   if (state.screen !== 'play') return;
   if (state.mission?.current) {
-    // A stage can be nudged forward when its typed condition already holds.
     if (missionStageReady()) nextStage();
     else announce('Complete the current objective first.');
     return;
@@ -226,7 +231,6 @@ function startMissionByKey() {
   state.missionKills = 0;
 }
 
-// Typed completion for the current stage.
 function missionStageReady() {
   return missions.stageComplete(missionContext());
 }
@@ -239,7 +243,6 @@ function updateMissionProgress() {
   if (!missions.current) return;
   missions.tick(STEP);
   missionTimer += STEP;
-  // A destroyed required vehicle fails the stage (recoverable by retrying).
   if (missionFailed()) {
     state.banner = { title: 'MISSION STAGE FAILED', sub: 'Objective lost — press J to restart the stage', next: 'GET BACK IN POSITION' };
     return;
@@ -286,11 +289,10 @@ function loadSlot(slot) {
   state.nextMission = slot.mission ?? 1;
   state.minimapLarge = Boolean(save.settings.minimapLarge);
   minimap.setLarge(state.minimapLarge);
-  // Resume an in-progress mission stage when a save carries one.
   if (slot.mission && slot.missionStage > 0) {
     missions.restoreStage(slot.mission, slot.missionStage);
     state.mission = missions;
-    state.mission.marker = missions.marker(world);
+    state.objectiveMarker = missions.marker(world);
   } else {
     state.mission = null;
   }
@@ -313,8 +315,6 @@ const playerMesh = meshes.makePlayer();
 scene.scene.add(playerMesh);
 playerMesh.visible = false;
 
-// Hook combat hit feedback into audio: a hit plays the soft hit, a miss plays the
-// gunshot, which the fireWeapon path also handles. The hook only adds the marker.
 combat.hooks = {
   onHit() { audio.hit(); },
   onMiss() { audio.gunshot(); },
@@ -322,7 +322,7 @@ combat.hooks = {
 
 function shotAutopilot() {
   if (shotName === 'chase' && player.inVehicle) {
-    const heading = Math.PI / 2 + Math.sin(frames * 0.012) * 0.05;
+    const heading = Math.PI / 2;
     player.vehicle.speed = 31;
     player.vehicle.heading = heading;
     player.vehicle.x += Math.sin(heading) * 31 * STEP;
@@ -334,23 +334,52 @@ function shotAutopilot() {
     for (let i = 0; i < police.units.length; i += 1) {
       const u = police.units[i];
       if (u.kind === 'air') {
-        u.x = player.pos.x - 30;
-        u.z = player.pos.z + 6;
+        u.x = player.pos.x + 34;
+        u.z = player.pos.z - 6;
         u.mesh.position.set(u.x, u.height, u.z);
+        u.mesh.rotation.y += 0.02;
         continue;
       }
-      const behind = 16 + i * 6;
-      const lateral = (i % 2 === 0 ? -1 : 1) * (4 + i * 1.4);
-      u.x = player.pos.x - behind;
-      u.z = player.pos.z + lateral;
+      // Stage the pursuit ahead of the player so the fixed chase camera sees the
+      // player car in the foreground and the CBP wedge + light bars ahead.
+      const ahead = 22 + i * 9;
+      const lane = (i % 2 === 0 ? -1 : 1) * (3.4 + i * 0.9);
+      u.x = player.pos.x + ahead;
+      u.z = player.pos.z + lane;
       u.mesh.position.set(u.x, 0.05, u.z);
       u.mesh.rotation.y = Math.PI / 2;
     }
+    // One cruiser tucked behind the player's rear quarter, visible on the left.
+    if (police.units.length) {
+      const tail = police.units[police.units.length - 1];
+      tail.x = player.pos.x - 18;
+      tail.z = player.pos.z + 7;
+      tail.mesh.position.set(tail.x, 0.05, tail.z);
+      tail.mesh.rotation.y = Math.PI / 2;
+    }
     if (state.rivalMesh) {
-      const rx = player.pos.x + 62;
-      state.rivalMesh.position.set(rx, 0.05, player.pos.z);
+      const rx = player.pos.x + 92;
+      state.rivalMesh.position.set(rx, 0.05, 446);
       state.rivalMesh.rotation.y = Math.PI / 2;
     }
+  }
+}
+
+function updateCamera() {
+  const cam = scene.camera;
+  if (state.shotCamera) {
+    cam.position.set(state.shotCamera.x, state.shotCamera.y, state.shotCamera.z);
+    cam.lookAt(state.shotCamera.lookX, state.shotCamera.lookY, state.shotCamera.lookZ);
+    return;
+  }
+  if (player.inVehicle) {
+    const back = 9.2, up = 3.6;
+    cam.position.set(player.pos.x - Math.sin(player.heading) * back, up, player.pos.z - Math.cos(player.heading) * back);
+    cam.lookAt(player.pos.x, 1.2, player.pos.z);
+  } else {
+    const back = 6.4, up = 2.4;
+    cam.position.set(player.pos.x - Math.sin(player.heading) * back, up, player.pos.z - Math.cos(player.heading) * back);
+    cam.lookAt(player.pos.x, 1.3, player.pos.z);
   }
 }
 
@@ -359,8 +388,11 @@ function step() {
   combat.step(STEP);
   audio.step(STEP, state);
 
+  // Read and dispatch input first, for every screen, so the title and pause
+  // menus answer the keyboard as well as the mouse.
+  handleActions(input.take());
+
   if (state.screen === 'play') {
-    handleActions(input.take());
     player.step(STEP, input, traffic, () => {});
     traffic.update(STEP, player, () => { audio.hit(); }, police);
     if (player.inVehicle) state.stats.distanceDriven += Math.abs(player.speed) * STEP / 1000;
@@ -371,6 +403,14 @@ function step() {
 
   state.wanted = police.wanted;
   state.district = world.districtAt(player.pos.x, player.pos.z);
+  // Police meshes are created by the police system but it does not own the scene,
+  // so main.js mounts every unit and roadblock barrier the first time it appears.
+  for (const u of police.units) {
+    if (!u.mesh.parent) scene.scene.add(u.mesh);
+  }
+  for (const b of police.blocks) {
+    if (b.mesh && !b.mesh.parent) scene.scene.add(b.mesh);
+  }
   police.update(STEP, player, scene.scene, () => { audio.busted(); }, () => { player.dents += 4; audio.hit(); });
 
   playerMesh.position.set(player.pos.x, player.inVehicle ? 1.1 : 0, player.pos.z);
@@ -389,12 +429,10 @@ function step() {
     hud.resize();
     minimap.resize();
   }
-  const back = 8.4, up = 4.2;
-  cam.position.set(player.pos.x - Math.sin(player.heading) * back, up + (player.inVehicle ? 1.4 : 0), player.pos.z - Math.cos(player.heading) * back);
-  cam.lookAt(player.pos.x, player.inVehicle ? 1.2 : 1.2, player.pos.z);
+  updateCamera();
 
   scene.updateSky(clock);
-  state.aiming = input.mouseDown() && !player.inVehicle;
+  state.aiming = (input.mouseDown() && !player.inVehicle) || state.shotName === 'foot';
 }
 
 let frames = 0;
@@ -413,7 +451,7 @@ function frame(now) {
   }
   renderer.render(scene.scene, scene.camera);
   hud.draw(state);
-  minimap.draw(state, now);
+  if (state.screen === 'play') minimap.draw(state, now);
   if (state.screen === 'title') menus.drawTitle(state);
   else if (state.screen === 'pause') menus.drawPause(state);
 }
@@ -425,7 +463,6 @@ hudCanvas.addEventListener('pointerdown', (e) => {
   else if (state.screen === 'pause' && hit?.type === 'tab') { menus.setTab(menus.tabs[hit.index]); }
 });
 
-// Make the pause menu's settings toggle the minimap size and persist it.
 const originalToggle = menus.toggleMinimapSize;
 menus.toggleMinimapSize = () => {
   state.minimapLarge = originalToggle();
@@ -438,7 +475,8 @@ if (shotName) {
   if (state.rivalMesh) scene.scene.add(state.rivalMesh);
   if (state.footProps) {
     scene.scene.add(state.footProps.body);
-    scene.scene.add(state.footProps.enemy);
+    scene.scene.add(state.footProps.enemy1);
+    scene.scene.add(state.footProps.enemy2);
   }
   if (state.minimapLarge) minimap.setLarge(true);
   let painted = 0;
@@ -446,11 +484,11 @@ if (shotName) {
     step();
     renderer.render(scene.scene, scene.camera);
     hud.draw(state);
-    minimap.draw(state, performance.now());
+    if (state.screen === 'play') minimap.draw(state, performance.now());
     if (state.screen === 'title') menus.drawTitle(state);
     else if (state.screen === 'pause') menus.drawPause(state);
     painted += 1;
-    if (painted < 2) requestAnimationFrame(shotFrame);
+    if (painted < 3) requestAnimationFrame(shotFrame);
     else window.__shotReady = true;
   }
   requestAnimationFrame(shotFrame);

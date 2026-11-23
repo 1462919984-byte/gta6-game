@@ -1,7 +1,7 @@
 // Every tuning number, colour, world constant and reward table for Solara Coast
 // lives in this one file so the rest of the game never hard-codes a magic value.
-// The new systems (multi-stage missions, coordinated pursuit, live minimap and
-// sprint/stamina) read their thresholds from here.
+// The golden-hour palette is deliberately saturated and warm: terracotta and
+// coral buildings, an orange sun low over the ocean, and a long-shadow key light.
 
 export const STEP = 1 / 60;
 
@@ -11,26 +11,37 @@ export const CITY = {
   roadW: 14,          // road width
   block: 46,          // building block size
   lanes: 2,
+  boulevardZ: 446,    // centre line of the palm-lined beach boulevard
 };
 
 export const COLOURS = {
-  skyTop: '#2b4a8f',
-  skyMid: '#c77b4a',
-  skyLow: '#f6c177',
-  sun: '#ffd27a',
+  // Sky gradient stops (top -> mid -> horizon).
+  skyTop: '#1f3f8c',
+  skyUpper: '#6a5aa8',
+  skyMid: '#e0794f',
+  skyLow: '#ffb35c',
+  skyHorizon: '#ffd9a0',
+  sunCore: '#fff3d0',
+  sunGlow: '#ffb35c',
   water: '#2e8fb0',
   waterDeep: '#1d6d8c',
-  sand: '#e7c98e',
-  road: '#2a2d34',
-  roadLine: '#d9b45a',
-  sidewalk: '#8a857a',
-  buildingA: '#e8c99a',
-  buildingB: '#d9a878',
-  buildingC: '#c9816a',
-  buildingD: '#9f7e6d',
+  waterSunset: '#c96a4a',
+  sand: '#f3d9a8',
+  sandDeep: '#e7c98e',
+  road: '#33313a',
+  roadLine: '#e6c98a',
+  sidewalk: '#b9a98c',
+  buildingA: '#f0c79a',
+  buildingB: '#e6a878',
+  buildingC: '#d98a6a',
+  buildingD: '#c9776a',
+  buildingE: '#b98a78',
+  roof: '#8a5a52',
   window: '#ffd98a',
+  windowNight: '#7fb7ff',
   palmTrunk: '#8a6a50',
-  palmLeaf: '#4f9e6b',
+  palmLeaf: '#3fae72',
+  palmLeafDark: '#2e8a5a',
   cop: '#1c2f5a',
   copLightBlue: '#3d8bff',
   copLightRed: '#ff4b4b',
@@ -38,8 +49,13 @@ export const COLOURS = {
   enemy: '#c94f4f',
   barrier: '#c8503c',
   barrierStripe: '#f2e2c0',
-  traffic: ['#c9d2d8', '#b3544a', '#5a7fae', '#e3e0d5', '#3a6f4f', '#d8a24a', '#7a5fa8'],
-  ped: ['#d9b8a3', '#b98a6a', '#8a6a52', '#e0d5c9', '#5f4a3a'],
+  stall: '#e8b06a',
+  stallRoof: '#c9776a',
+  stringLight: '#ffd27a',
+  stringLightGlow: '#ff9a5a',
+  tracer: '#ffd27a',
+  traffic: ['#e8d9c0', '#b3544a', '#5a7fae', '#e3e0d5', '#3a6f4f', '#d8a24a', '#7a5fa8', '#c94f6a'],
+  ped: ['#d9b8a3', '#b98a6a', '#8a6a52', '#e0d5c9', '#5f4a3a', '#c9a884'],
 };
 
 export const PLAYER = {
@@ -50,9 +66,9 @@ export const PLAYER = {
   maxHealth: 100,
   maxArmour: 100,
   maxStamina: 100,
-  sprintDrain: 24,       // stamina lost per second while sprinting
-  sprintRegen: 30,       // stamina regained per second while resting
-  minSprintStamina: 6,   // must have this much before sprinting again
+  sprintDrain: 24,
+  sprintRegen: 30,
+  minSprintStamina: 6,
 };
 
 export const VEHICLE = {
@@ -67,20 +83,17 @@ export const VEHICLE = {
 
 export const WANTED = {
   maxStars: 5,
-  // Escape/cooldown: a star decays only after this many seconds with no unit
-  // holding line of sight, plus a little extra for each star on top.
   escapeTime: 5.5,
   escapePerStar: 2.0,
-  losRange: 112,          // a unit can see the player within this many metres
-  losSamples: 6,          // ray samples used to check building occlusion
-  // Response composition by wanted stars (0 = none).
+  losRange: 112,
+  losSamples: 6,
   unitCounts: [0, 2, 3, 4, 6, 8],
-  carRatio: 0.45,         // fraction of ground units that are cruisers
-  roadblockLevel: 3,      // roadblocks begin at 3 stars
-  helicopterLevel: 4,     // Air One joins at 4 stars
-  interceptAhead: 70,     // interceptors aim this far ahead of the player
-  flankAhead: 38,         // flankers lead the player by this distance
-  roadblockAhead: 92,     // roadblocks are placed this far down the road
+  carRatio: 0.45,
+  roadblockLevel: 3,
+  helicopterLevel: 4,
+  interceptAhead: 70,
+  flankAhead: 38,
+  roadblockAhead: 92,
   pursuitTopSpeed: 42,
   unitTopSpeed: 46,
 };
@@ -92,8 +105,8 @@ export const MINIMAP = {
   smallCanvasH: 172,
   largeCanvasW: 640,
   largeCanvasH: 640,
-  refreshMs: 100,         // full map redraw at most 10 times per second
-  worldScale: 1.05,       // metres -> minimap pixels at small size
+  refreshMs: 100,
+  worldScale: 1.05,
   blip: {
     player: '#4fc3f7',
     police: '#4d8bff',
@@ -105,10 +118,10 @@ export const MINIMAP = {
 };
 
 export const MISSION_REWARDS = {
-  stageCash: 250,          // paid immediately when a stage completes
-  stageRespect: 15,        // paid immediately when a stage completes
+  stageCash: 250,
+  stageRespect: 15,
   respect: { GOLD: 100, SILVER: 60, BRONZE: 35 },
-  cash: [0, 900, 1400, 1800, 2200, 2600, 3000, 3400, 4200], // per mission id
+  cash: [0, 900, 1400, 1800, 2200, 2600, 3000, 3400, 4200],
 };
 
 export const WEAPONS = [
@@ -134,12 +147,12 @@ export const CREW = [
 ];
 
 export const DISTRICTS = [
-  { id: 'mariposa', name: 'OLD MARIPOSA', blurb: 'Stilt houses and the night market', friendly: 74 },
-  { id: 'vista', name: 'VISTA DEL SOL', blurb: 'Palm-lined beach boulevard', friendly: 62 },
-  { id: 'coral', name: 'CORAL HEIGHTS', blurb: 'Glass towers and rooftop bars', friendly: 41 },
-  { id: 'palma', name: 'PALMA VIEJA', blurb: 'Cobbled alleys under bougainvillea', friendly: 85 },
-  { id: 'mirador', name: 'MIRADOR HILLS', blurb: 'Winding lanes above the bay', friendly: 33 },
-  { id: 'puerto', name: 'PUERTO NUEVO', blurb: 'Cargo docks and salt air', friendly: 18 },
+  { id: 'mariposa', name: 'OLD MARIPOSA', blurb: 'Stilt houses and the night market', friendly: 74, cx: -360, cz: -120 },
+  { id: 'vista', name: 'VISTA DEL SOL', blurb: 'Palm-lined beach boulevard', friendly: 62, cx: 120, cz: 420 },
+  { id: 'coral', name: 'CORAL HEIGHTS', blurb: 'Glass towers and rooftop bars', friendly: 41, cx: 330, cz: -260 },
+  { id: 'palma', name: 'PALMA VIEJA', blurb: 'Cobbled alleys under bougainvillea', friendly: 85, cx: -120, cz: 200 },
+  { id: 'mirador', name: 'MIRADOR HILLS', blurb: 'Winding lanes above the bay', friendly: 33, cx: 420, cz: 140 },
+  { id: 'puerto', name: 'PUERTO NUEVO', blurb: 'Cargo docks and salt air', friendly: 18, cx: 300, cz: 320 },
 ];
 
 export const KEY = {

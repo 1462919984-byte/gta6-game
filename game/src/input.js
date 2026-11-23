@@ -29,7 +29,7 @@ export function createInput(target) {
     if (event.code === 'Escape' || event.code === 'KeyP') {
       if (!event.repeat) buttons |= A_PAUSE;
       event.preventDefault();
-    } else if (event.code === 'KeyF') {
+    } else if (event.code === 'KeyF' || event.code === 'Enter' || event.code === 'NumpadEnter') {
       if (!event.repeat) buttons |= A_ENTER;
     } else if (KEY.fire.includes(event.code) && !event.repeat) {
       buttons |= A_FIRE;

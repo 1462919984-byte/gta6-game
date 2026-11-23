@@ -173,7 +173,7 @@ export function createMinimap(canvas) {
     drawDistrictLabels(state);
 
     // Mission objective.
-    const marker = state.mission?.marker;
+    const marker = state.objectiveMarker;
     if (marker) drawBlip(marker.x, marker.z, MINIMAP.blip.mission, 5, state, 'diamond');
 
     drawPlayer(state);

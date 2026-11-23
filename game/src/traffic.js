@@ -33,6 +33,7 @@ export function createTraffic(world, random, meshes) {
     if (world.blockedCircle(x, z, 2)) continue;
     const colour = COLOURS.traffic[i % COLOURS.traffic.length];
     const mesh = meshes.makeCar(colour);
+    mesh.traverse(o => { if (o.isMesh) o.frustumCulled = false; });
     const profile = weightedPick(random, driverProfiles.map(p => ({ value: p, weight: p.weight })));
     cars.push({
       mesh, vertical, lane, x, z,
@@ -54,6 +55,7 @@ export function createTraffic(world, random, meshes) {
     const z = nearBeach ? 400 + random() * 80 : -440 + random() * 900;
     if (world.blockedCircle(x, z, 1)) continue;
     const mesh = meshes.makePerson(COLOURS.ped[i % COLOURS.ped.length], null);
+    mesh.traverse(o => { if (o.isMesh) o.frustumCulled = false; });
     peds.push({
       mesh, x, z,
       targetX: x + (random() - 0.5) * 20,
